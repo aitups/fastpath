@@ -1,7 +1,7 @@
 ## Product Requirements Document (PRD): The "FastPath" Agentic Framework
 
 **Version:** 1.1 (Revised for Advanced Features)
-**Date:** October 26, 2023
+**Date:** June 24th, 2025
 **Status:** Draft
 **Author:** Product Management
 
@@ -436,3 +436,39 @@ Install only the dependencies for the backends you need:
 - PGVector: `poetry add llama-index-vector-stores-pgvector psycopg2-binary`
 
 If a backend is selected but the dependency is not installed, an `ImportError` will be raised at runtime.
+
+---
+
+### Example: Collaborative Orchestrator Usage
+
+The orchestrator now supports both sequential and collaborative (real-time) modes. In collaborative mode, agents interact via a shared message bus, and the orchestrator moderates the conversation.
+
+```python
+from fastpath.agent import Agent
+from fastpath.memory import LongTermMemory
+from fastpath.tools import Tool
+from fastpath.orchestrator import Orchestrator
+
+class MyTool(Tool):
+    def __init__(self):
+        super().__init__(name="my_tool", description="My custom tool")
+    def run(self, text):
+        return text[::-1]
+
+class CollabAgent(Agent):
+    def act(self, task, context=None):
+        messages = context if context is not None else []
+        return f"{self.name} vio {len(messages)} mensajes y tarea '{task}'"
+
+tool = MyTool()
+memory = LongTermMemory(config={})
+agent1 = CollabAgent(name="A1", role="R1", tools=[tool], memory=memory, llm_provider=None)
+agent2 = CollabAgent(name="A2", role="R2", tools=[tool], memory=memory, llm_provider=None)
+
+orchestrator = Orchestrator(agents=[agent1, agent2], mode="collaborative")
+result = orchestrator.run("tarea colaborativa")
+print(result)  # Output: A2 vio 2 mensajes y tarea 'tarea colaborativa'
+```
+
+- In collaborative mode, each agent receives the full message history and can post new messages.
+- The orchestrator returns the last message posted as the result.
