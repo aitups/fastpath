@@ -34,3 +34,18 @@ def test_orchestrator_sequential(mock_llm_provider):
     orchestrator = Orchestrator(agents=[agent1, agent2], mode="sequential")
     result = orchestrator.run("tarea de prueba")
     assert result == "A2 ejecuta tarea de prueba"
+
+def test_orchestrator_collaborative(mock_llm_provider):
+    tool = DummyTool()
+    memory = DummyMemory(config={})
+    # Cada agente responde con su nombre y el número de mensajes que ve
+    class CollabAgent(Agent):
+        def act(self, task, context=None):
+            messages = context if context is not None else []
+            return f"{self.name} vio {len(messages)} mensajes y tarea '{task}'"
+    agent1 = CollabAgent(name="A1", role="R1", tools=[tool], memory=memory, llm_provider=mock_llm_provider)
+    agent2 = CollabAgent(name="A2", role="R2", tools=[tool], memory=memory, llm_provider=mock_llm_provider)
+    orchestrator = Orchestrator(agents=[agent1, agent2], mode="collaborative")
+    result = orchestrator.run("tarea colaborativa")
+    # El resultado debe ser la respuesta del último agente
+    assert result == f"A2 vio 2 mensajes y tarea 'tarea colaborativa'"
