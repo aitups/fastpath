@@ -154,16 +154,16 @@ Knowledge workers spend an inordinate amount of time on low-value, repetitive ta
 
 ---
 
-## Detalles de Implementación
+## Implementation Details
 
-### Arquitectura de Clases
+### Class Architecture
 
 ```mermaid
 classDiagram
     class Agent {
         - name: str
         - role: str
-        - tools: List[Tool]
+        - tools: List~Tool~
         - memory: LongTermMemory
         - scratchpad: list
         + act(task: str, context: Any): Any
@@ -175,38 +175,38 @@ classDiagram
     }
     class LongTermMemory {
         - storage_path: str
-        + add(embedding: List[float], metadata: dict)
-        + query(query_embedding: List[float], top_k: int): list
+        + add(embedding: List~float~, metadata: dict)
+        + query(query_embedding: List~float~, top_k: int): list
     }
     class Orchestrator {
-        - agents: List[Agent]
+        - agents: List~Agent~
         - mode: str
         + run(task: str, context: Any): Any
     }
     class KnowledgeBase {
         - storage_path: str
         + ingest(data: Any)
-        + query(query: str, top_k: int): List[Any]
+        + query(query: str, top_k: int): List~Any~
     }
     class LLMProvider {
         - config: dict
         + generate(prompt: str, **kwargs): str
     }
     class MessageBus {
-        - messages: List[Message]
+        - messages: List~Message~
         + post(message: Message)
-        + get_all(): List[Message]
+        + get_all(): List~Message~
     }
-    Agent --> Tool
-    Agent --> LongTermMemory
-    Orchestrator --> Agent
-    Agent --> KnowledgeBase
-    Orchestrator --> MessageBus
-    Agent --> LLMProvider
-    MessageBus --> Message
+    Agent --> "*" Tool
+    Agent --> "1" LongTermMemory
+    Orchestrator --> "*" Agent
+    Agent --> "1" KnowledgeBase
+    Orchestrator --> "1" MessageBus
+    Agent --> "1" LLMProvider
+    MessageBus --> "*" Message
 ```
 
-### Diagrama de Secuencia (Ejecución Secuencial)
+### Sequence Diagram (Sequential Execution)
 
 ```mermaid
 sequenceDiagram
@@ -223,61 +223,70 @@ sequenceDiagram
     Agent1->>LTM1: query(context)
     Agent1->>KB: query(task)
     Agent1->>Tool: run(tool)
-    Agent1-->>Orchestrator: resultado parcial
-    Orchestrator->>Agent2: act(task, contexto)
+    Agent1-->>Orchestrator: partial result
+    Orchestrator->>Agent2: act(task, context)
     Agent2->>LTM2: query(context)
     Agent2->>KB: query(task)
     Agent2->>Tool: run(tool)
-    Agent2-->>Orchestrator: resultado final
-    Orchestrator-->>User: resultado final
+    Agent2-->>Orchestrator: final result
+    Orchestrator-->>User: final result
 ```
 
-### Instrucciones para Ejecutar Tests
+### Instructions for Running Tests
 
-1. Instala las dependencias (si no lo has hecho):
-   ```bash
-   poetry install
-   ```
-2. Ejecuta los tests:
-   ```bash
-   poetry run pytest
-   ```
+1.  Install dependencies (if you haven't already):
+    ```bash
+    poetry install
+    ```
+2.  Run tests:
+    ```bash
+    poetry run pytest
+    ```
 
-### Configuración de un Nuevo Equipo de Agentes
+### Configuring a New Agent Team
 
-1. Define tus herramientas personalizadas en un módulo propio o en `tools.py`.
-2. Implementa tus agentes heredando de `Agent` y sobreescribe el método `act`.
-3. Instancia los agentes y el orquestador en un script, por ejemplo:
-   ```python
-   from fastpath.agent import Agent
-   from fastpath.memory import LongTermMemory
-   from fastpath.tools import Tool
-   from fastpath.orchestrator import Orchestrator
+1.  Define your custom tools in their own module or in `tools.py`.
+2.  Implement your agents by inheriting from `Agent` and overriding the `act` method.
+3.  Instantiate the agents and the orchestrator in a script, for example:
+    ```python
+    from fastpath.agent import Agent
+    from fastpath.memory import LongTermMemory
+    from fastpath.tools import Tool
+    from fastpath.orchestrator import Orchestrator
 
-   class MiHerramienta(Tool):
-       def __init__(self):
-           super().__init__(name="mi_tool", description="Mi herramienta personalizada")
-       def run(self, x):
-           return x[::-1]
+    class MyTool(Tool):
+        def __init__(self):
+            super().__init__(name="my_tool", description="My custom tool")
+        def run(self, text_to_reverse: str):
+            return text_to_reverse[::-1]
 
-   class MiAgente(Agent):
-       def act(self, task, context=None):
-           return f"{self.name} resuelve {task} usando {self.tools[0].run(task)}"
+    class MyAgent(Agent):
+        def act(self, task: str, context=None):
+            # For simplicity, this agent just uses its first tool
+            tool_result = self.tools[0].run(task)
+            return f"{self.name} solved the task. Result: {tool_result}"
 
-   tool = MiHerramienta()
-   memory = LongTermMemory(storage_path=":memory:")
-   agente = MiAgente(name="AgenteX", role="Solver", tools=[tool], memory=memory)
-   orchestrator = Orchestrator(agents=[agente], mode="sequential")
-   resultado = orchestrator.run("invertir texto")
-   print(resultado)
-   ```
+    # 1. Create the building blocks
+    tool = MyTool()
+    memory = LongTermMemory(storage_path=":memory:") # Using an in-memory placeholder
 
-### Ejecución del Sistema
+    # 2. Create the agent
+    my_agent = MyAgent(name="AgentX", role="Text Reverser", tools=[tool], memory=memory)
 
-Puedes ejecutar el ejemplo mínimo incluido en `src/main.py`:
+    # 3. Create the orchestrator with the agent
+    orchestrator = Orchestrator(agents=[my_agent], mode="sequential")
+
+    # 4. Run the task
+    final_result = orchestrator.run("reverse this text")
+    print(final_result)
+    ```
+
+### Running the System
+
+You can run the minimal example included in `src/main.py`:
 
 ```bash
 poetry run python src/main.py
 ```
 
-O tu propio script siguiendo el ejemplo anterior.
+Or run your own script following the example above.
