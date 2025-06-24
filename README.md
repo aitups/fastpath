@@ -324,3 +324,115 @@ embedding_provider: openai
 embedding_model: 'text-embedding-3-small'
 ```
 The full example `config.yaml` shows how to structure the file with the necessary API keys and model names for each provider. Remember to set the API keys as environment variables.
+
+## Persistent Memory Providers
+
+FastPath supports multiple backends for agent long-term memory. You can select the provider and configure its parameters in `config.yaml`.
+
+### Supported Providers
+
+- **in_memory**: Stores embeddings in a Python list (default, for development/testing)
+- **influxdb**: Stores embeddings in an InfluxDB bucket
+- **redis**: Stores embeddings as serialized JSON in a Redis list
+- **couchbase**: Stores embeddings as documents in a Couchbase bucket
+
+### Example Configuration (`config.yaml`)
+
+```yaml
+memory_provider: redis  # Options: in_memory, influxdb, redis, couchbase
+
+memory_config:
+  in_memory: {}
+  influxdb:
+    url: "http://localhost:8086"
+    token: "my-token"
+    org: "my-org"
+    bucket: "fastpath"
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+  couchbase:
+    connection_string: "couchbase://localhost"
+    username: "Administrator"
+    password: "password"
+    bucket: "fastpath"
+```
+
+### Usage in Code
+
+```python
+from fastpath.memory import get_memory_from_config
+
+memory = get_memory_from_config("config.yaml")
+# Use memory.add(embedding, metadata) and memory.query(query_embedding, top_k)
+```
+
+### Optional Dependencies
+
+Install only the dependencies for the backends you need:
+
+- InfluxDB: `poetry add influxdb-client`
+- Redis: `poetry add redis`
+- Couchbase: `poetry add couchbase`
+
+If a backend is selected but the dependency is not installed, an `ImportError` will be raised at runtime.
+
+## Knowledge Base: External Vector Store Support
+
+FastPath can use both in-memory and external vector stores for the Knowledge Base (RAG). You can select the provider and configure its parameters in `config.yaml`.
+
+### Supported Vector Stores
+
+- **in_memory**: Default, uses LlamaIndex's in-memory VectorStoreIndex
+- **chroma**: Uses ChromaDB for persistent vector storage
+- **milvus**: Uses Milvus for scalable vector search
+- **elasticsearch**: Uses Elasticsearch as a vector store
+- **pgvector**: Uses Postgres with the pgvector extension
+
+### Example Configuration (`config.yaml`)
+
+```yaml
+vector_store_provider: chroma  # Options: in_memory, chroma, milvus, elasticsearch, pgvector
+
+vector_store_config:
+  in_memory: {}
+  chroma:
+    persist_directory: "./chroma_db"
+  milvus:
+    host: "localhost"
+    port: 19530
+    collection_name: "fastpath"
+  elasticsearch:
+    host: "localhost"
+    port: 9200
+    index_name: "fastpath"
+  pgvector:
+    host: "localhost"
+    port: 5432
+    user: "postgres"
+    password: "password"
+    database: "fastpath"
+    table_name: "vectors"
+```
+
+### Usage in Code
+
+```python
+from fastpath.knowledge_base import KnowledgeBase
+
+kb = KnowledgeBase(config_path="config.yaml")
+kb.ingest("./docs")  # Ingests documents from a directory
+results = kb.query("What is FastPath?")
+```
+
+### Optional Dependencies
+
+Install only the dependencies for the backends you need:
+
+- Chroma: `poetry add llama-index-vector-stores-chroma chromadb`
+- Milvus: `poetry add llama-index-vector-stores-milvus pymilvus`
+- Elasticsearch: `poetry add llama-index-vector-stores-elasticsearch elasticsearch`
+- PGVector: `poetry add llama-index-vector-stores-pgvector psycopg2-binary`
+
+If a backend is selected but the dependency is not installed, an `ImportError` will be raised at runtime.

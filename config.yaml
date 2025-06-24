@@ -30,4 +30,47 @@ embedding_model: 'all-MiniLM-L6-v2' # For huggingface
 # embedding_model: 'text-embedding-ada-002' # For openai
 
 # --- Knowledge Base and Memory ---
-vector_store_path: './fastpath_db' 
+vector_store_path: './fastpath_db'
+
+# --- Memory Provider Configuration ---
+memory_provider: in_memory  # Options: in_memory, influxdb, redis, couchbase
+
+memory_config:
+  in_memory: {}
+  influxdb:
+    url: "http://localhost:8086"
+    token: "my-token"
+    org: "my-org"
+    bucket: "fastpath"
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+  couchbase:
+    connection_string: "couchbase://localhost"
+    username: "Administrator"
+    password: "password"
+    bucket: "fastpath"
+
+# --- Vector Store Provider Configuration ---
+vector_store_provider: in_memory  # Options: in_memory, chroma, milvus, elasticsearch, pgvector
+
+vector_store_config:
+  in_memory: {}
+  chroma:
+    persist_directory: "./chroma_db"
+  milvus:
+    host: "localhost"
+    port: 19530
+    collection_name: "fastpath"
+  elasticsearch:
+    host: "localhost"
+    port: 9200
+    index_name: "fastpath"
+  pgvector:
+    host: "localhost"
+    port: 5432
+    user: "postgres"
+    password: "password"
+    database: "fastpath"
+    table_name: "vectors" 
