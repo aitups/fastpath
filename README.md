@@ -290,3 +290,37 @@ poetry run python src/main.py
 ```
 
 Or run your own script following the example above.
+
+### Advanced Configuration
+
+The framework is configured via the `config.yaml` file, allowing you to easily switch between different LLMs and embedding models.
+
+#### LLM Provider (`llm_provider`)
+
+This setting determines which Language Model Provider agents will use by default. Supported options are:
+*   `openai`: For using models like GPT-4, GPT-3.5, etc. Requires an `OPENAI_API_KEY`.
+*   `gemini`: For using Google's Gemini models. Requires a `GEMINI_API_KEY`.
+*   `ollama`: For connecting to a local Ollama server.
+
+**Example:**
+```yaml
+llm_provider: openai
+```
+
+#### Embedding Provider (`embedding_provider`)
+
+This setting determines which model is used to create embeddings for the `KnowledgeBase` (RAG). Supported options are:
+*   `huggingface`: Uses a sentence-transformer model from Hugging Face. Runs locally.
+*   `openai`: Uses one of OpenAI's embedding models. Requires an `OPENAI_API_KEY`.
+
+**Example:**
+```yaml
+embedding_provider: huggingface
+embedding_model: 'sentence-transformers/all-MiniLM-L6-v2'
+```
+or
+```yaml
+embedding_provider: openai
+embedding_model: 'text-embedding-3-small'
+```
+The full example `config.yaml` shows how to structure the file with the necessary API keys and model names for each provider. Remember to set the API keys as environment variables.

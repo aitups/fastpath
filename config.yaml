@@ -1,17 +1,33 @@
-llm_provider: ollama # 'openai', 'ollama', 'vllm', 'llama_cpp'
+# --- LLM Provider Configuration ---
+# Select the default LLM provider for agents.
+# Options: 'openai', 'ollama', 'gemini'
+llm_provider: ollama
 
+# --- LLM Specific Settings ---
+# Configure the parameters for each LLM provider.
+# Only the section for the selected 'llm_provider' will be used.
 llm_config:
-  # For Ollama or vLLM
-  model: 'qwen3:4b'
-  base_url: 'http://localhost:11434'
-  
-  # For OpenAI
-  # model: 'gpt-4o'
-  # api_key: ${OPENAI_API_KEY}
+  openai:
+    model: 'gpt-4o'
+    api_key: ${OPENAI_API_KEY} # Loaded from environment variables
 
-  # For llama_cpp
-  # model_path: '/path/to/your/model.gguf'
-  # n_gpu_layers: -1 # -1 to offload all layers to GPU
+  ollama:
+    model: 'llama3:8b'
+    base_url: 'http://localhost:11434'
 
-embedding_model: 'all-MiniLM-L6-v2'
+  gemini:
+    model: 'gemini-pro'
+    api_key: ${GEMINI_API_KEY} # Loaded from environment variables
+
+# --- Embedding Model Configuration ---
+# Select the provider for generating embeddings (for RAG/KnowledgeBase).
+# Options: 'huggingface', 'openai'
+embedding_provider: huggingface
+
+# --- Embedding Model Specific Settings ---
+# Configure the model for the selected 'embedding_provider'.
+embedding_model: 'all-MiniLM-L6-v2' # For huggingface
+# embedding_model: 'text-embedding-ada-002' # For openai
+
+# --- Knowledge Base and Memory ---
 vector_store_path: './fastpath_db' 
