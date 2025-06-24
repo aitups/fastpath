@@ -28,9 +28,9 @@ def mock_llm_provider():
 
 def test_orchestrator_sequential(mock_llm_provider):
     tool = DummyTool()
-    memory = DummyMemory(storage_path=":memory:")
+    memory = DummyMemory(config={})
     agent1 = MockAgent(name="A1", role="R1", tools=[tool], memory=memory, llm_provider=mock_llm_provider)
     agent2 = MockAgent(name="A2", role="R2", tools=[tool], memory=memory, llm_provider=mock_llm_provider)
     orchestrator = Orchestrator(agents=[agent1, agent2], mode="sequential")
     result = orchestrator.run("tarea de prueba")
-    assert result == "A2 ejecuta tarea de prueba" 
+    assert result == "A2 ejecuta tarea de prueba"

@@ -11,7 +11,7 @@ class DummyMemory(LongTermMemory):
         return [(self.last_embedding, self.last_metadata)] if hasattr(self, 'last_embedding') else []
 
 def test_memory_add_and_query():
-    memory = DummyMemory(storage_path=":memory:")
+    memory = DummyMemory(config={})
     embedding = [0.1, 0.2, 0.3]
     metadata = {"info": "test"}
     memory.add(embedding, metadata)
@@ -72,4 +72,4 @@ def test_couchbase_memory_init(mock_auth, mock_cluster):
     memory = CouchbaseMemory(config)
     assert hasattr(memory, "cluster")
     assert hasattr(memory, "bucket")
-    assert hasattr(memory, "collection") 
+    assert hasattr(memory, "collection")

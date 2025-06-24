@@ -23,7 +23,7 @@ def mock_llm_provider():
 
 def test_agent_init(mock_llm_provider):
     tool = DummyTool()
-    memory = DummyMemory(storage_path=":memory:")
+    memory = DummyMemory(config={})
     agent = Agent(name="TestAgent", role="Tester", tools=[tool], memory=memory, llm_provider=mock_llm_provider)
     assert agent.name == "TestAgent"
     assert agent.role == "Tester"
@@ -34,7 +34,7 @@ def test_agent_init(mock_llm_provider):
 def test_agent_select_tool(mock_llm_provider):
     tool1 = DummyTool(name="search", description="Search the web")
     tool2 = DummyTool(name="calculate", description="Calculate a math expression")
-    memory = DummyMemory(storage_path=":memory:")
+    memory = DummyMemory(config={})
     
     mock_llm_provider.generate.return_value = "calculate"
     
@@ -51,7 +51,7 @@ def test_agent_select_tool(mock_llm_provider):
 
 def test_agent_act(mock_llm_provider):
     tool = DummyTool(name="reverser", description="Reverses text")
-    memory = DummyMemory(storage_path=":memory:")
+    memory = DummyMemory(config={})
     
     agent = Agent(name="TestAgent", role="Tester", tools=[tool], memory=memory, llm_provider=mock_llm_provider)
     # Mock select_tool to isolate the act method's logic
@@ -61,4 +61,4 @@ def test_agent_act(mock_llm_provider):
     
     agent.select_tool.assert_called_once_with("reverse this")
     # DummyTool just returns the input
-    assert result == "reverse this" 
+    assert result == "reverse this"
