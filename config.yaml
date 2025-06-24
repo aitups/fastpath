@@ -1,0 +1,17 @@
+llm_provider: ollama # 'openai', 'ollama', 'vllm', 'llama_cpp'
+
+llm_config:
+  # For Ollama or vLLM
+  model: 'qwen3:4b'
+  base_url: 'http://localhost:11434'
+  
+  # For OpenAI
+  # model: 'gpt-4o'
+  # api_key: ${OPENAI_API_KEY}
+
+  # For llama_cpp
+  # model_path: '/path/to/your/model.gguf'
+  # n_gpu_layers: -1 # -1 to offload all layers to GPU
+
+embedding_model: 'all-MiniLM-L6-v2'
+vector_store_path: './fastpath_db' 

@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "fastpath"
+version = "0.1.0"
+description = ""
+authors = ["esc <edusc.wrk@gmail.com>"]
+readme = "README.md"
+packages = [
+    { include = "fastpath", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = ">3.12, <4.0"
+pyyaml = "^6.0.2"
+llama-index = "^0.12.43"
+langchain = "^0.3.26"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

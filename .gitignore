@@ -1,0 +1,23 @@
+# Environments
+.venv
+venv/
+env/
+ENV/
+__pycache__/
+
+# Build/distribution
+build/
+dist/
+*.egg-info/
+
+# Test reports
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE folders
+.vscode/
+.idea/
+
+# Poetry lock file
+poetry.lock 
