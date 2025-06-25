@@ -1,34 +1,32 @@
 from fastpath.agent import Agent
 from fastpath.memory import LongTermMemory
-from fastpath.tools import Tool
+from fastpath.tools import Tool, LangChainToolAdapter
 from fastpath.orchestrator import Orchestrator
-
-class DummyTool(Tool):
-    def __init__(self):
-        super().__init__(name="echo", description="Devuelve el input")
-    def run(self, text):
-        return text
-
-class DummyMemory(LongTermMemory):
-    def add(self, embedding, metadata):
-        pass
-    def query(self, query_embedding, top_k=5):
-        return []
-
-class DummyAgent(Agent):
-    def act(self, task, context=None):
-        print(f"{self.name} ({self.role}) ejecutando tarea: {task}")
-        for tool in self.tools:
-            print(f"Usando herramienta: {tool.name}")
-        return f"Resultado de {self.name} para {task}"
+from dotenv import load_dotenv
 
 def main():
-    tool = DummyTool()
-    memory = DummyMemory(storage_path=":memory:")
-    agent = DummyAgent(name="Agente1", role="Investigador", tools=[tool], memory=memory)
-    orchestrator = Orchestrator(agents=[agent], mode="sequential")
-    result = orchestrator.run("Investiga el tema X")
+    load_dotenv()
+    # Importar el wrapper de Serper de LangChain Community
+    from langchain_community.utilities import GoogleSerperAPIWrapper
+    # Instanciar la herramienta web y adaptarla (asignando nombre y descripción manualmente)
+    web_tool = LangChainToolAdapter(
+        GoogleSerperAPIWrapper(),
+        name="GoogleSerperSearch",
+        description="Búsqueda web en Google vía Serper (requiere SERPER_API_KEY)"
+    )
+    class DummyMemory(LongTermMemory):
+        def add(self, embedding, metadata):
+            pass
+        def query(self, query_embedding, top_k=5):
+            return []
+    memory = DummyMemory(config={})
+    from fastpath.llm_provider import get_llm_provider_from_config
+    llm_provider = get_llm_provider_from_config()  # Usará HuggingFace por defecto
+    researcher = Agent(name="Investigador", role="Investigar en internet y sintetizar información", tools=[web_tool], memory=memory, llm_provider=llm_provider)
+    writer = Agent(name="Escritor", role="Redactar informes y resúmenes claros", tools=[], memory=memory, llm_provider=llm_provider)
+    orchestrator = Orchestrator(agents=[researcher, writer], mode="smart")
+    result = orchestrator.run("Investiga en detalle el tema 'Como vender servicios de IA a pymes y startups' usando fuentes web y redacta un informe")
     print("Resultado final:", result)
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -472,3 +472,133 @@ print(result)  # Output: A2 vio 2 mensajes y tarea 'tarea colaborativa'
 
 - In collaborative mode, each agent receives the full message history and can post new messages.
 - The orchestrator returns the last message posted as the result.
+
+---
+
+## Web Search Tool Integration (v1.1+)
+
+FastPath ahora permite a los agentes usar herramientas web reales para obtener información actualizada desde internet. Por defecto, se integra la herramienta Google Search vía Serper (GoogleSerperAPIWrapper de LangChain), que permite búsquedas web generales y es fácilmente extensible a otras fuentes.
+
+### Ejemplo de uso en `src/main.py`
+
+```python
+from fastpath.agent import Agent
+from fastpath.memory import LongTermMemory
+from fastpath.tools import LangChainToolAdapter
+from fastpath.orchestrator import Orchestrator
+from dotenv import load_dotenv
+
+def main():
+    load_dotenv()
+    from langchain_community.utilities import GoogleSerperAPIWrapper
+    web_tool = LangChainToolAdapter(
+        GoogleSerperAPIWrapper(),
+        name="GoogleSerperSearch",
+        description="Búsqueda web en Google vía Serper (requiere SERPER_API_KEY)"
+    )
+    class DummyMemory(LongTermMemory):
+        def add(self, embedding, metadata):
+            pass
+        def query(self, query_embedding, top_k=5):
+            return []
+    memory = DummyMemory(config={})
+    from fastpath.llm_provider import get_llm_provider_from_config
+    llm_provider = get_llm_provider_from_config()
+    agent = Agent(name="Agente1", role="Investigador", tools=[web_tool], memory=memory, llm_provider=llm_provider)
+    orchestrator = Orchestrator(agents=[agent], mode="sequential")
+    result = orchestrator.run("Investiga el tema X usando fuentes web")
+    print("Resultado final:", result)
+
+if __name__ == "__main__":
+    main()
+```
+
+### Requisitos
+- Instala las dependencias necesarias:
+  ```bash
+  poetry add langchain_community
+  ```
+- Añade tu clave de API de Serper en el archivo `.env`:
+  ```env
+  SERPER_API_KEY=tu_clave_de_serper
+  ```
+- La herramienta web puede ser reemplazada fácilmente por otras de LangChain (Wikipedia, Bing, etc.) usando el adaptador `LangChainToolAdapter`.
+
+---
+
+## Orquestador en modo 'smart' y fallback inteligente
+
+FastPath incluye un modo avanzado de orquestación llamado `smart`, que permite:
+- Descomponer automáticamente un objetivo complejo en subtareas usando el LLM del orquestador.
+- Asignar cada subtarea al agente más adecuado según su rol.
+- Ejecutar cada subtarea y resumir el resultado global.
+- Si ninguna subtarea puede ser resuelta por los agentes disponibles (por ejemplo, falta un agente con acceso web), el orquestador añade un mensaje explicativo como fallback.
+
+### Ejemplo de uso
+
+```python
+from fastpath.agent import Agent
+from fastpath.memory import LongTermMemory
+from fastpath.tools import Tool
+from fastpath.orchestrator import Orchestrator
+from fastpath.llm_provider import get_llm_provider_from_config
+
+# Definir agentes con distintos roles
+class DummyMemory(LongTermMemory):
+    def add(self, embedding, metadata):
+        pass
+    def query(self, query_embedding, top_k=5):
+        return []
+
+class DummyTool(Tool):
+    def __init__(self):
+        super().__init__(name="echo", description="Devuelve el input")
+    def run(self, text):
+        return text
+
+llm_provider = get_llm_provider_from_config()
+
+agent1 = Agent(name="Redactor", role="Escribir informes", tools=[DummyTool()], memory=DummyMemory(config={}), llm_provider=llm_provider)
+agent2 = Agent(name="Analista", role="Analizar datos", tools=[], memory=DummyMemory(config={}), llm_provider=llm_provider)
+
+# Orquestador en modo smart
+orchestrator = Orchestrator(agents=[agent1, agent2], mode="smart")
+
+# Ejemplo: objetivo que requiere investigar en internet (pero ningún agente tiene esa capacidad)
+result = orchestrator.run("Investiga en internet las tendencias de IA en 2025 y redacta un informe")
+print(result)
+```
+
+**Salida esperada:**
+- El orquestador descompone el objetivo en subtareas.
+- Si alguna subtarea no puede ser asignada a un agente compatible, se añade un mensaje fallback indicando la limitación.
+- El resumen final lo genera el LLM del orquestador.
+
+---
+
+## Logging y trazabilidad en FastPath
+
+FastPath utiliza el sistema estándar de logging de Python para registrar todas las acciones relevantes de los agentes y el orquestador, incluyendo:
+- Timestamp de cada acción
+- Nivel de log (INFO, WARNING, etc.)
+- Nombre de la clase que ejecuta la acción
+
+Esto permite depuración avanzada y auditoría de flujos complejos.
+
+### Ejemplo de salida de logging
+
+```
+2025-06-25 18:00:00 [INFO] fastpath.Orchestrator: [Orchestrator] Ejecutando run con modo 'smart' para tarea: 'Investiga en detalle el tema ...'
+2025-06-25 18:00:00 [INFO] fastpath.Orchestrator: [Orchestrator] Planificación LLM: ...
+2025-06-25 18:00:01 [INFO] fastpath.Orchestrator: [Orchestrator] Ejecutando subtarea 'Buscar información web' con agente: Investigador
+2025-06-25 18:00:01 [INFO] fastpath.Agent: [Agent] Ejecutando tarea: 'Buscar información web'
+2025-06-25 18:00:01 [INFO] fastpath.Agent: [Agent] Seleccionando herramienta para tarea: 'Buscar información web'
+2025-06-25 18:00:01 [INFO] fastpath.Agent: [Agent] LLM sugiere herramienta: 'web_tool'
+2025-06-25 18:00:01 [INFO] fastpath.Agent: [Agent] Usando herramienta: web_tool
+...
+2025-06-25 18:00:02 [INFO] fastpath.Orchestrator: [Orchestrator] Resumen final generado por LLM.
+```
+
+Puedes ver los logs en la consola al ejecutar cualquier flujo de FastPath. Esto facilita la trazabilidad y el análisis de decisiones automáticas.
+
+---

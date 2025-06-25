@@ -1,6 +1,6 @@
 # --- LLM Provider Configuration ---
 # Select the default LLM provider for agents.
-# Options: 'openai', 'ollama', 'gemini'
+# Options: 'openai', 'ollama', 'gemini', 'huggingface'
 llm_provider: ollama
 
 # --- LLM Specific Settings ---
@@ -12,12 +12,16 @@ llm_config:
     api_key: ${OPENAI_API_KEY} # Loaded from environment variables
 
   ollama:
-    model: 'llama3:8b'
+    model: 'qwen3:4b'
     base_url: 'http://localhost:11434'
 
   gemini:
-    model: 'gemini-pro'
-    api_key: ${GEMINI_API_KEY} # Loaded from environment variables
+    model: 'gemini-2.5-flash'
+    # api_key: ${GEMINI_API_KEY} # Loaded from environment variables
+
+  huggingface:
+    model: 'deepseek/deepseek-r1-0528-qwen3-8b'
+    # api_key: ${HUGGINGFACE_API_TOKEN} # Uncomment and set or use env var
 
 # --- Embedding Model Configuration ---
 # Select the provider for generating embeddings (for RAG/KnowledgeBase).
@@ -73,4 +77,11 @@ vector_store_config:
     user: "postgres"
     password: "password"
     database: "fastpath"
-    table_name: "vectors" 
+    table_name: "vectors"
+
+# --- Web Search Tool Configuration ---
+# Configure the web search tool for agents (default: Google Search via Serper)
+web_search:
+  provider: serper
+  description: 'Google Search via Serper (requires SERPER_API_KEY in .env)'
+  # No extra config needed, just set SERPER_API_KEY in your environment
