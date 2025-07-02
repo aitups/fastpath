@@ -64,7 +64,9 @@ class Orchestrator:
         plan_prompt = (
             f"You are a task planner. The main objective is: '{task}'.\n"
             f"Available agents:\n{agent_list}\n"
-            "Break down the objective into 2-5 detailed subtasks. For each subtask, assign the most suitable agent by name.\n"
+            "You will break down the objective into subtasks and assign them to the most suitable agents.\n"
+            "To do so, you must first list the ouputs of the main goal. Then break down the subtasks to achieve those outputs.\n"
+            "Each subtask should be specific and assigned to an agent based on their role and capabilities.\n"
             "It's important to avoid overlapping on the tasks and try be as most specific as can be. For example, if you have a writer and a researcher, break into research tasks and writing tasks, but avoiding assigning any researching task to the writer."
             "The sequential execution of the tasks must output a suitable answer for the main goal or task."
             "Respond in JSON as a list of objects: [{subtask: str, agent: str}]"
