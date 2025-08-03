@@ -576,29 +576,69 @@ print(result)
 
 ---
 
-## Logging y trazabilidad en FastPath
+## Estructura modular y estrategias de ejecución
 
-FastPath utiliza el sistema estándar de logging de Python para registrar todas las acciones relevantes de los agentes y el orquestador, incluyendo:
-- Timestamp de cada acción
-- Nivel de log (INFO, WARNING, etc.)
-- Nombre de la clase que ejecuta la acción
+A partir de la versión 1.2, FastPath desacopla las estrategias de ejecución del orquestador en un archivo independiente (`strategies.py`). Esto permite una arquitectura más limpia y flexible, facilitando la extensión y el mantenimiento.
 
-Esto permite depuración avanzada y auditoría de flujos complejos.
-
-### Ejemplo de salida de logging
+### Estructura de archivos relevante
 
 ```
-2025-06-25 18:00:00 [INFO] fastpath.Orchestrator: [Orchestrator] Ejecutando run con modo 'smart' para tarea: 'Investiga en detalle el tema ...'
-2025-06-25 18:00:00 [INFO] fastpath.Orchestrator: [Orchestrator] Planificación LLM: ...
-2025-06-25 18:00:01 [INFO] fastpath.Orchestrator: [Orchestrator] Ejecutando subtarea 'Buscar información web' con agente: Investigador
-2025-06-25 18:00:01 [INFO] fastpath.Agent: [Agent] Ejecutando tarea: 'Buscar información web'
-2025-06-25 18:00:01 [INFO] fastpath.Agent: [Agent] Seleccionando herramienta para tarea: 'Buscar información web'
-2025-06-25 18:00:01 [INFO] fastpath.Agent: [Agent] LLM sugiere herramienta: 'web_tool'
-2025-06-25 18:00:01 [INFO] fastpath.Agent: [Agent] Usando herramienta: web_tool
-...
-2025-06-25 18:00:02 [INFO] fastpath.Orchestrator: [Orchestrator] Resumen final generado por LLM.
+fastpath/
+    agent.py
+    orchestrator.py  # Solo contiene la clase Orchestrator
+    strategies.py    # Contiene todas las estrategias de ejecución
+    ...
 ```
 
-Puedes ver los logs en la consola al ejecutar cualquier flujo de FastPath. Esto facilita la trazabilidad y el análisis de decisiones automáticas.
+### Uso de estrategias
+
+Para seleccionar una estrategia de ejecución, importa la clase deseada desde `fastpath.strategies` y pásala al orquestador:
+
+```python
+from fastpath.agent import Agent
+from fastpath.memory import LongTermMemory
+from fastpath.tools import LangChainToolAdapter
+from fastpath.orchestrator import Orchestrator
+from fastpath.strategies import SequentialStrategy, CollaborativeStrategy, SmartStrategy, HierarchicalStrategy
+
+# Ejemplo: ejecución jerárquica
+orchestrator = Orchestrator(agents=[...], strategy=HierarchicalStrategy())
+result = orchestrator.run("Tu tarea principal")
+```
+
+Las estrategias disponibles son:
+- `SequentialStrategy`: ejecución secuencial
+- `CollaborativeStrategy`: colaboración en tiempo real
+- `SmartStrategy`: planificación automática con LLM
+- `HierarchicalStrategy`: ejecución jerárquica con dependencias entre subtareas
+
+Consulta el archivo `strategies.py` para ver la implementación y personalizar o añadir nuevas estrategias.
+
+---
+
+## Ejemplo: Registro de estrategias personalizadas
+
+FastPath permite registrar nuevas estrategias de orquestación de forma dinámica y sencilla. Por ejemplo:
+
+```python
+from fastpath.strategies import ExecutionStrategy, register_strategy
+
+class CustomStrategy(ExecutionStrategy):
+    def run(self, orchestrator, task, context=None):
+        # Lógica personalizada
+        return f"Resultado personalizado para: {task}"
+
+register_strategy("custom", CustomStrategy, aliases=["personalizada"])
+```
+
+Luego, puedes usarla en el orquestador:
+
+```python
+from fastpath.orchestrator import Orchestrator
+orc = Orchestrator(mode="custom")
+resultado = orc.run("Mi tarea especial")
+```
+
+Consulta `src/fastpath/strategies.py` para más ejemplos y detalles.
 
 ---
