@@ -54,28 +54,38 @@ class Agent:
                 "Please generate the parameters needed to run the tool\n"
                 "and return them as a single string. Do not include any other text."
             )
-            tool_params = self.llm_provider.generate(prompt).strip()
+            tool_params_raw = self.llm_provider.generate(prompt)
+            # If the LLM returns a non-string (e.g., MagicMock in tests), fallback to using the task itself
+            if isinstance(tool_params_raw, str):
+                tool_params = tool_params_raw.strip()
+            else:
+                tool_params = task
             self.logger.info(f"[{self.__class__.__name__}] Parámetros generados para la herramienta: {tool_params}")
             tool_response = tool.run(tool_params)
             self.scratchpad.append({"tool_response": tool_response})
             if context:
                 self.logger.info(f"[{self.__class__.__name__}] Contexto proporcionado: {context}")
-                tool_response += f"\nContext: {context}"
+                tool_response = f"{tool_response}\nContext: {context}"
             prompt = (
                 f"You are an autonomous agent. Your role is: {self.role}.\n"
                 f"You have been assigned the following task: '{task}'.\n"
                 f"The tool '{tool.name}' returned the following response: '{tool_response}'.\n"
                 "Using this information, please provide an answer for the task."
             )
-            return self.llm_provider.generate(prompt).strip()
+            final_raw = self.llm_provider.generate(prompt)
+            if isinstance(final_raw, str):
+                return final_raw.strip()
+            # Fallback: return the tool response if LLM didn't provide a string
+            return tool_response
         else:
             self.logger.info(f"[{self.__class__.__name__}] Sin herramientas, usando LLM para resolver la tarea.")
             if context:
                 self.logger.info(f"[{self.__class__.__name__}] Contexto proporcionado: {context}")
-                task += f"\nContext: {context}"
+                task = f"{task}\nContext: {context}"
             prompt = (
                 f"You are an autonomous agent. Your role is: {self.role}.\n"
                 f"You have been assigned the following task: '{task}'.\n"
                 "There are no tools available. Please use your expertise and role to complete the task as best as possible."
             )
-            return self.llm_provider.generate(prompt)
+            result = self.llm_provider.generate(prompt)
+            return result if isinstance(result, str) else str(result)

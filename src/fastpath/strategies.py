@@ -2,6 +2,7 @@ from typing import Any
 import logging
 import json
 import re
+import ast
 from .collaboration import Message
 
 class ExecutionStrategy:
@@ -70,8 +71,8 @@ class SmartStrategy(ExecutionStrategy):
         try:
             subtasks = json.loads(json_block)
         except Exception as e:
-            subtasks = [{"subtask": task, "agent": a.name} for a in orchestrator.agents]
             orchestrator.logger.warning(f"[{orchestrator.__class__.__name__}] Error al parsear el JSON de planificación: {e}")
+            subtasks = [{"subtask": task, "agent": a.name} for a in orchestrator.agents]
             orchestrator.logger.warning(f"[{orchestrator.__class__.__name__}] No se pudo parsear el JSON de planificación {json_block}. Usando fallback: {subtasks}")
         orchestrator.logger.info(f"[{orchestrator.__class__.__name__}] Planificación LLM: {subtasks}")
         results = []
@@ -99,37 +100,95 @@ class SmartStrategy(ExecutionStrategy):
         return {"subtasks": results, "summary": summary}
 
 class HierarchicalStrategy(ExecutionStrategy):
-    def _validate_task_graph(self, subtasks):
-        # Construir el grafo de dependencias
-        graph = {}
-        names = [sub.get("subtask") or f"subtask_{i}" for i, sub in enumerate(subtasks)]
+    def _normalize_name(self, sub, index):
+        # Prefer explicit id if present, otherwise subtask name, otherwise positional name
+        if "id" in sub and sub["id"] is not None:
+            return f"id:{sub['id']}"
+        return sub.get("subtask") or f"subtask_{index}"
+
+    def _build_graph(self, subtasks):
+        # Build node keys and helper maps
+        node_keys = []
+        index_to_key = {}
+        name_to_key = {}
+        id_to_key = {}
         for i, sub in enumerate(subtasks):
-            name = sub.get("subtask") or f"subtask_{i}"
-            depends = sub.get("depends_on", [])
-            graph[name] = set(depends)
-        # Detección de ciclos usando DFS
-        visited = set()
-        rec_stack = set()
-        def dfs(node):
-            if node not in graph:
-                return False
-            if node in rec_stack:
-                return True
-            if node in visited:
-                return False
-            visited.add(node)
-            rec_stack.add(node)
-            for neighbor in graph[node]:
-                if neighbor == node:
-                    continue  # ignorar autodependencia
-                if dfs(neighbor):
-                    return True
-            rec_stack.remove(node)
-            return False
-        for node in graph:
-            if dfs(node):
-                return True
-        return False
+            key = self._normalize_name(sub, i)
+            node_keys.append(key)
+            index_to_key[i] = key
+            # If key is id:<val>, register id map
+            if isinstance(key, str) and key.startswith("id:"):
+                try:
+                    id_val = int(key.split(":", 1)[1])
+                    id_to_key[id_val] = key
+                except Exception:
+                    pass
+            # also map by subtask name if present
+            if "subtask" in sub and sub["subtask"]:
+                name_to_key[sub["subtask"]] = key
+
+        graph = {k: set() for k in node_keys}
+
+        for i, sub in enumerate(subtasks):
+            dst_key = node_keys[i]
+            raw_deps = sub.get("depends_on", []) or []
+            for dep in raw_deps:
+                # Resolve dep: try id match first, then index, then name
+                dep_key = None
+                if isinstance(dep, int):
+                    if dep in id_to_key:
+                        dep_key = id_to_key[dep]
+                    elif 0 <= dep < len(node_keys):
+                        dep_key = index_to_key[dep]
+                    else:
+                        raise ValueError(f"Dependency index {dep} out of range for subtask '{dst_key}'")
+                elif isinstance(dep, str) and dep.isdigit():
+                    d = int(dep)
+                    if d in id_to_key:
+                        dep_key = id_to_key[d]
+                    elif 0 <= d < len(node_keys):
+                        dep_key = index_to_key[d]
+                    else:
+                        raise ValueError(f"Dependency index string '{dep}' out of range for subtask '{dst_key}'")
+                elif isinstance(dep, str):
+                    if dep in id_to_key:
+                        dep_key = id_to_key[dep]
+                    elif dep in name_to_key:
+                        dep_key = name_to_key[dep]
+                    else:
+                        # last resort: if dep equals a node key directly
+                        if dep in graph:
+                            dep_key = dep
+                        else:
+                            raise ValueError(f"Dependency name '{dep}' not found for subtask '{dst_key}'")
+                else:
+                    raise ValueError(f"Unsupported dependency type {type(dep)} for subtask '{dst_key}'")
+                if dep_key == dst_key:
+                    raise ValueError(f"Subtask '{dst_key}' cannot depend on itself")
+                graph[dep_key].add(dst_key)
+
+        # compute incoming edges
+        incoming = {name: 0 for name in node_keys}
+        for src, dests in graph.items():
+            for dst in dests:
+                incoming[dst] += 1
+        return node_keys, graph, incoming
+
+    def _detect_cycle_kahn(self, names, graph, incoming):
+        # Kahn's algorithm: try to produce a topo order
+        queue = [n for n in names if incoming[n] == 0]
+        processed = 0
+        order = []
+        while queue:
+            node = queue.pop(0)
+            order.append(node)
+            processed += 1
+            for neigh in list(graph.get(node, [])):
+                incoming[neigh] -= 1
+                if incoming[neigh] == 0:
+                    queue.append(neigh)
+        has_cycle = processed != len(names)
+        return has_cycle, order
 
     def run(self, orchestrator, task: str, context: Any = None) -> Any:
         orchestrator.logger.info(f"[HierarchicalStrategy] Ejecutando modo jerárquico para tarea: '{task}'")
@@ -137,8 +196,10 @@ class HierarchicalStrategy(ExecutionStrategy):
         plan_prompt = (
             f"You are a hierarchical task planner. The main objective is: '{task}'.\n"
             f"Available agents:\n{agent_list}\n"
-            "Break down the objective into 2-7 subtasks. For each subtask, specify dependencies (by subtask index or name) and assign the most suitable agent by name.\n"
-            "Respond in JSON as a list of objects: [{subtask: str, agent: str, depends_on: List[str]}] where 'depends_on' is a list of subtask names or indices that must be completed first."
+            "Break down the objective into subtasks. For each subtask, specify dependencies (by subtask index or name) and assign the most suitable agent by name.\n"
+            "To do so, you must first list the outputs of the main goal. Then break down the subtasks to achieve those outputs.\n"
+            "It's importat that the plan must have only one initial task with no dependencies, and only one final task that produces the final output. Intermediate tasks must have dependencies and be depencies of other subtasks.\n"
+            "Respond in JSON as a list of objects: [{id: int, subtask: str, agent: str, depends_on: List[int]}] where 'depends_on' is a list of subtask names or indices that must be completed first."
         )
         plan_response = orchestrator.llm_provider.generate(plan_prompt)
         if not isinstance(plan_response, str):
@@ -152,46 +213,71 @@ class HierarchicalStrategy(ExecutionStrategy):
         try:
             subtasks = json.loads(json_block)
         except Exception as e:
-            orchestrator.logger.warning(f"[HierarchicalStrategy] Error al parsear el JSON de planificación: {e}")
-            subtasks = [{"subtask": task, "agent": a.name, "depends_on": []} for a in orchestrator.agents]
+            # Try parsing a Python literal (e.g., str(list) from mocked LLMs)
+            try:
+                parsed = ast.literal_eval(json_block)
+                if isinstance(parsed, list):
+                    subtasks = parsed
+                else:
+                    raise
+            except Exception:
+                orchestrator.logger.warning(f"[HierarchicalStrategy] Error al parsear el JSON de planificación: {e}")
+                subtasks = [{"subtask": task, "agent": a.name, "depends_on": []} for a in orchestrator.agents]
+
         orchestrator.logger.info(f"[HierarchicalStrategy] Planificación LLM: {subtasks}")
-        # Validar grafo de dependencias
-        if self._validate_task_graph(subtasks):
+        # Build graph and validate dependencies
+        try:
+            names, graph, incoming = self._build_graph(subtasks)
+        except Exception as e:
+            orchestrator.logger.error(f"[HierarchicalStrategy] Invalid dependency specification: {e}")
+            raise
+        # Detect cycles using Kahn
+        has_cycle, topo_order = self._detect_cycle_kahn(names, graph, incoming.copy())
+        if has_cycle:
             msg = "[HierarchicalStrategy] Error: El grafo de dependencias contiene ciclos. No se puede ejecutar."
             orchestrator.logger.error(msg)
             raise ValueError(msg)
+        orchestrator.logger.info(f"[HierarchicalStrategy] Topological order: {topo_order}")
+        # Prepare mapping
+        name_to_subtask = {self._normalize_name(sub, i): sub for i, sub in enumerate(subtasks)}
         results = {}
         completed = set()
-        subtask_names = [sub.get("subtask") or f"subtask_{i}" for i, sub in enumerate(subtasks)]
-        name_to_subtask = {sub.get("subtask") or f"subtask_{i}": sub for i, sub in enumerate(subtasks)}
-        while len(completed) < len(subtasks):
-            ready_to_run = []
-            for i, name in enumerate(subtask_names):
-                if name in completed:
-                    continue
-                depends = name_to_subtask[name].get("depends_on", [])
-                if all(dep in completed or dep == name for dep in depends):
-                    ready_to_run.append(name)
-            if not ready_to_run:
-                orchestrator.logger.error("[HierarchicalStrategy] Deadlock detected: no subtasks ready to run, but not all completed.")
-                raise RuntimeError("Deadlock detected in hierarchical strategy execution.")
-            for name in ready_to_run:
-                sub = name_to_subtask[name]
-                agent = next((a for a in orchestrator.agents if a.name == sub["agent"]), None)
-                depends = sub.get("depends_on", [])
-                dep_outputs = [results[dep]["result"] for dep in depends if dep in results]
-                context_for_subtask = "\n".join(str(out) for out in dep_outputs) if dep_outputs else context
-                if agent:
-                    orchestrator.logger.info(f"[HierarchicalStrategy] Ejecutando subtarea '{name}' con agente: {agent.name}")
-                    result = agent.act(name, context_for_subtask)
-                    results[name] = {"agent": agent.name, "subtask": name, "result": result}
+        # Execute tasks in layers determined by incoming edges: tasks with incoming 0 first, etc.
+        # Instead of break/continue, iterate over topo_order and execute when dependencies are met.
+        for name in topo_order:
+            sub = name_to_subtask[name]
+            depends_raw = sub.get("depends_on", []) or []
+            # Resolve dependency names to normalized names
+            depends = []
+            for dep in depends_raw:
+                if isinstance(dep, int):
+                    depends.append(names[dep])
+                elif isinstance(dep, str) and dep.isdigit():
+                    depends.append(names[int(dep)])
                 else:
-                    fallback = (
-                        f"No available agent is compatible with the subtask: '{name}'. "
-                        f"Please review the agent roles or add an agent with the required capabilities."
-                    )
-                    orchestrator.logger.warning(f"[HierarchicalStrategy] Fallback: {fallback}")
-                    results[name] = {"agent": sub["agent"], "subtask": name, "result": fallback}
+                    depends.append(dep)
+            # Ensure all declared dependencies are present
+            missing = [d for d in depends if d not in names and d not in name_to_subtask]
+            if missing:
+                msg = f"[HierarchicalStrategy] Error: Dependencias no encontradas para '{name}': {missing}"
+                orchestrator.logger.error(msg)
+                raise ValueError(msg)
+            # Gather context only from dependencies
+            dep_outputs = [results[d]["result"] for d in depends if d in results]
+            context_for_subtask = "\n".join(str(out) for out in dep_outputs) if dep_outputs else context
+            agent = next((a for a in orchestrator.agents if a.name == sub["agent"]), None)
+            if agent:
+                orchestrator.logger.info(f"[HierarchicalStrategy] Ejecutando subtarea '{name}' con agente: {agent.name}")
+                result = agent.act(name, context_for_subtask)
+                results[name] = {"agent": agent.name, "subtask": name, "result": result}
+                completed.add(name)
+            else:
+                fallback = (
+                    f"No available agent is compatible with the subtask: '{name}'. "
+                    f"Please review the agent roles or add an agent with the required capabilities."
+                )
+                orchestrator.logger.warning(f"[HierarchicalStrategy] Fallback: {fallback}")
+                results[name] = {"agent": sub["agent"], "subtask": name, "result": fallback}
                 completed.add(name)
         summary_prompt = (
             f"You are a project manager. Here are the results of hierarchical subtasks for the main objective '{task}':\n"

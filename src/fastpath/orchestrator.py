@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Optional
 from .agent import Agent
 from .collaboration import Message, MessageBus
 from .llm_provider import get_llm_provider_from_config, LLMProvider
@@ -17,8 +17,8 @@ class Orchestrator:
     """
     Orquestador que gestiona la colaboración entre agentes usando estrategias desacopladas.
     """
-    def __init__(self, agents: List[Agent], mode: str = None, strategy: ExecutionStrategy = None, llm_provider: LLMProvider = None):
-        self.agents = agents
+    def __init__(self, agents: Optional[List[Agent]] = None, mode: str = None, strategy: ExecutionStrategy = None, llm_provider: LLMProvider = None):
+        self.agents = agents or []
         # Permitir compatibilidad con el parámetro 'mode' usando el registro dinámico
         if strategy is not None:
             self.strategy = strategy
