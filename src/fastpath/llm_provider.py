@@ -84,66 +84,65 @@ class HuggingFaceProvider(LLMProvider):
         response.raise_for_status()
         result = response.json()
         # imprimir la estructura de la respuesta para depuración
-        print(f"Respuesta de HuggingFace: {result}")
         generated_text = ""
         # Soporta tanto respuesta string como lista de dicts
         # puede que el contenido venga en el campo generated_text, choices, message o content
         # también puede seguir la estructura message.content
         if isinstance(result, list) and len(result) > 0 and 'text' in result[0]:
-            print("Respuesta es una lista de diccionarios con 'text'")
+            #print("Respuesta es una lista de diccionarios con 'text'")
             generated_text = str(result[0]['text'])
         if isinstance(result, list) and len(result) > 0 and 'generated_text' in result[0]:
-            print("Respuesta es una lista de diccionarios con 'generated_text'")
+            #print("Respuesta es una lista de diccionarios con 'generated_text'")
             generated_text = str(result[0]['generated_text'])
         elif isinstance(result, dict) and 'generated_text' in result:
             # Asume que la respuesta es del tipo HuggingFace con 'generated_text'
             generated_text = str(result['generated_text'])
         elif isinstance(result, dict) and 'choices' in result and len(result['choices']) > 0:
-            print("Respuesta es un diccionario con 'choices'")
+            #print("Respuesta es un diccionario con 'choices'")
             # Asume que la respuesta es del tipo OpenAI con 'choices' y 'message'
             if 'message' in result['choices'][0]:
-                print("Respuesta contiene 'message' en 'choices'")
+                #print("Respuesta contiene 'message' en 'choices'")
                 generated_text = str(result['choices'][0]['message']['content'])
-                print(f"Mensaje generado: {generated_text}")
+                #print(f"Mensaje generado: {generated_text}")
             elif 'text' in result['choices'][0]:
-                print("Respuesta contiene 'text' en 'choices'")
+                #print("Respuesta contiene 'text' en 'choices'")
                 generated_text = str(result['choices'][0]['text'])
             # Si no hay 'message', puede ser un formato diferente
             generated_text = str(result['choices'][0])
         elif isinstance(result, dict) and 'message' in result:
             if 'content' in result['message']:
-                print("Respuesta contiene 'content' en 'message'")
+                #print("Respuesta contiene 'content' en 'message'")
                 generated_text = str(result['message']['content'])
             else:
                 # Si no hay 'content', puede ser un formato diferente
                 # Asumimos que es un mensaje completo
                 if isinstance(result['message'], str):
-                    print("Respuesta es un string en 'message'")
+                    #print("Respuesta es un string en 'message'")
                     generated_text = result['message']
                 else:
                     # Si es un dict, convertimos a string
                     # Esto es útil si el mensaje es un dict con más información
                     # como role, content, etc.
-                    print("Respuesta es un dict en 'message'")
+                    #print("Respuesta es un dict en 'message'")
                     generated_text = str(result['message'])
         elif isinstance(result, dict) and 'choices' in result:
-            print("Respuesta es un diccionario con 'choices'")
+            #print("Respuesta es un diccionario con 'choices'")
             generated_text = str(result['choices'][0]['message'])
         elif isinstance(result, str):
-            print("Respuesta es un string")
+            #print("Respuesta es un string")
             generated_text = result
         else:
-            print("Respuesta no coincide con ningún formato esperado")
+            #print("Respuesta no coincide con ningún formato esperado")
             generated_text = str(result)
         # Si la respuesta incluye un apartado <think> hay que eliminarlo
         if "<think>" in generated_text:
             think_start = generated_text.index("<think>") + len("<think>")
             think_end = generated_text.index("</think>")
             # Logamos la cadena de pensamiento
-            print(f"Cadena de pensamiento: {generated_text[think_start:think_end]}")
+            #print(f"Cadena de pensamiento: {generated_text[think_start:think_end]}")
             # Eliminamos la cadena de pensamiento del texto generado
             generated_text = generated_text[:think_start] + generated_text[think_end + len("</think>"):]
-            print(f"Texto generado sin cadena de pensamiento: {generated_text}")
+            #print(f"Texto generado sin cadena de pensamiento: {generated_text}")
         return generated_text
 
 class LlamaIndexLLMAdapter(CustomLLM):

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fastpath"
-version = "0.1.7"
+version = "0.1.9"
 description = ""
 authors = ["esc <edusc.wrk@gmail.com>"]
 readme = "README.md"
@@ -21,7 +21,7 @@ google-generativeai = ">=0.8.5"
 influxdb-client = ">=1.49.0"
 redis = ">=6.2.0"
 couchbase = ">=4.4.0"
-llama-index-vector-stores-postgres = ">=0.5.3"
+llama-index-vector-stores-postgres = ">=0.4.2"
 llama-index-vector-stores-chroma = ">=0.4.2"
 llama-index-vector-stores-milvus = ">=0.8.5"
 llama-index-vector-stores-elasticsearch = ">=0.4.3"

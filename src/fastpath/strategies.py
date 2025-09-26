@@ -246,6 +246,7 @@ class HierarchicalStrategy(ExecutionStrategy):
         # Instead of break/continue, iterate over topo_order and execute when dependencies are met.
         for name in topo_order:
             sub = name_to_subtask[name]
+            subtask = sub.get("subtask", name)
             depends_raw = sub.get("depends_on", []) or []
             # Resolve dependency names to normalized names
             depends = []
@@ -267,9 +268,9 @@ class HierarchicalStrategy(ExecutionStrategy):
             context_for_subtask = "\n".join(str(out) for out in dep_outputs) if dep_outputs else context
             agent = next((a for a in orchestrator.agents if a.name == sub["agent"]), None)
             if agent:
-                orchestrator.logger.info(f"[HierarchicalStrategy] Ejecutando subtarea '{name}' con agente: {agent.name}")
-                result = agent.act(name, context_for_subtask)
-                results[name] = {"agent": agent.name, "subtask": name, "result": result}
+                orchestrator.logger.info(f"[HierarchicalStrategy] Ejecutando subtarea '{name} - {subtask}' con agente: {agent.name}")
+                result = agent.act(subtask, context_for_subtask)
+                results[name] = {"agent": agent.name, "subtask": subtask, "result": result}
                 completed.add(name)
             else:
                 fallback = (

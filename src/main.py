@@ -25,7 +25,7 @@ def main_smart():
     writer = Agent(name="Escritor", role="Redactar informes y resúmenes claros", tools=[], memory=memory, llm_provider=llm_provider)
     orchestrator = Orchestrator(agents=[researcher, writer], mode="smart")
     result = orchestrator.run("Investiga en detalle el tema 'Como vender servicios de IA a pymes y startups' usando fuentes web y redacta un informe")
-    print("Resultado final:", result)
+    # print("Resultado final:", result)  # Depuración
 
 def main_hierarchical():
     load_dotenv()
@@ -49,7 +49,7 @@ def main_hierarchical():
     orchestrator = Orchestrator(agents=agents, strategy=HierarchicalStrategy())
     task = "Preparar un informe sobre cómo vender servicios de IA a pymes y startups. Primero, el investigador debe buscar en internet sobre: 1) beneficios de la IA para pymes, 2) casos de éxito de IA en startups, 3) estrategias de venta de IA. Después, el escritor debe usar cada resultado para crear un informe estructurado."
     result = orchestrator.run(task)
-    print("Resultado jerárquico:", result)
+    # print("Resultado jerárquico:", result)  # Depuración
 
 def main():
     # With argument -m or --mode invoke the cooresponding main function
@@ -63,7 +63,7 @@ def main():
     elif args.mode == 'hierarchical':
         main_hierarchical()
     else:
-        print("Modo no reconocido. Usa 'smart' o 'hierarchical'.")
+    # print("Modo no reconocido. Usa 'smart' o 'hierarchical'.")  # Depuración
     
 
 if __name__ == "__main__":
