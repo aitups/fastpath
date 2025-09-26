@@ -1,0 +1,33 @@
+graph LR
+  UI[Usuario / CLI]
+  Main[src/main.py]
+  Orch[Orchestrator]
+  StratModule[strategies.py]
+  AgentA[Agent A]
+  AgentB[Agent B]
+  Tools[Tools / LangChainToolAdapter]
+  Memory[LongTermMemory]
+  MessageBus[MessageBus collab]
+  LLM[LLMProvider]
+  ExtSearch[Serper / Google Serper API]
+  ExtLLM[HuggingFace Inference API]
+  VectorDB[Embeddings / Vector Stores]
+
+  UI -->|run_task| Main
+  Main --> Orch
+  Orch --> StratModule
+  Orch --> LLM
+  Orch --> AgentA
+  Orch --> AgentB
+  AgentA --> Tools
+  AgentB --> Tools
+  AgentA --> Memory
+  AgentB --> Memory
+  AgentA --> LLM
+  AgentB --> LLM
+  Tools --> ExtSearch
+  LLM --> ExtLLM
+  Memory --> VectorDB
+  Orch --> MessageBus
+  MessageBus --> AgentA
+  MessageBus --> AgentB

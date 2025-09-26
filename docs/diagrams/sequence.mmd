@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant U as Usuario
+  participant O as Orchestrator
+  participant P as Planner(Orch.LLM)
+  participant A1 as Investigador
+  participant A2 as Escritor
+  participant T as Tool(Serper)
+  U->>O: run("preparar informe X")
+  O->>P: "Divide en subtareas JSON"
+  P-->>O: JSON plan (subtasks w/ ids, depends_on)
+  O->>O: validar grafo (deps exist, no cycles)
+  O->>A1: asigna subtareas R1,R2,R3
+  A1->>T: buscar web (R1)
+  T-->>A1: resultados R1
+  A1-->>O: resultado R1a
+  O->>A2: asigna tarea "redactar" con context = R1+R2+R3
+  A2->>LLM: redactar informe
+  A2-->>O: informe final
+  O-->>U: resumen / informe

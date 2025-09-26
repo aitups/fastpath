@@ -1,0 +1,52 @@
+classDiagram
+  class Orchestrator {
+    - agents: List[Agent]
+    - strategy: ExecutionStrategy
+    - llm_provider: LLMProvider
+    + run(task, context)
+  }
+  class ExecutionStrategy {
+    <<interface>>
+    + run(orchestrator, task, context)
+  }
+  class SequentialStrategy
+  class CollaborativeStrategy
+  class SmartStrategy
+  class HierarchicalStrategy
+  ExecutionStrategy <|-- SequentialStrategy
+  ExecutionStrategy <|-- CollaborativeStrategy
+  ExecutionStrategy <|-- SmartStrategy
+  ExecutionStrategy <|-- HierarchicalStrategy
+
+  class Agent {
+    - name: str
+    - role: str
+    - tools: List[Tool]
+    - memory: LongTermMemory
+    - llm_provider: LLMProvider
+    + select_tool(task): Tool|None
+    + act(task, context): Any
+  }
+  class Tool {
+    - name
+    - description
+    + run(text)
+  }
+  class LangChainToolAdapter {
+    + run(text)
+  }
+  class LongTermMemory {
+    + add(embedding, metadata)
+    + query(embedding, top_k)
+  }
+  class MessageBus {
+    + publish(msg)
+    + read(agent)
+  }
+
+  Orchestrator --> ExecutionStrategy
+  Orchestrator --> Agent
+  Agent --> Tool
+  Tool <|-- LangChainToolAdapter
+  Agent --> LongTermMemory
+  Orchestrator --> MessageBus
