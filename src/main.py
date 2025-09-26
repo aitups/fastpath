@@ -62,9 +62,8 @@ def main():
         main_smart()
     elif args.mode == 'hierarchical':
         main_hierarchical()
-    else:
+    # else:
     # print("Modo no reconocido. Usa 'smart' o 'hierarchical'.")  # Depuración
     
-
 if __name__ == "__main__":
     main()
