@@ -40,32 +40,49 @@ class Agent:
         # Fallback: return the first tool if available
         return self.tools[0] if self.tools else None
 
-    def act(self, task: str, context: Any = None) -> Any:
-        self.logger.info(f"[{self.__class__.__name__}] Ejecutando tarea: '{task}'")
+    def act(self, task: str, context: Any = None, callback: Any = None) -> Any:
+        def emit(msg: str):
+            self.logger.info(msg)
+            if callback:
+                callback(msg)
+
+        emit(f"[{self.name}] Iniciando tarea: '{task}'")
+        
+        emit(f"[{self.name}] Analizando herramientas disponibles...")
         tool = self.select_tool(task)
         self.scratchpad.append({"task": task, "selected_tool": tool.name if tool else None})
-        # Hay que tener en cuenta el contexto como parametro y el de la memoria
+        
         if tool:
-            self.logger.info(f"[{self.__class__.__name__}] Usando herramienta: {tool.name} - {tool.description}")
+            emit(f"[{self.name}] Herramienta seleccionada: {tool.name}")
+            emit(f"[{self.name}] Generando parámetros para {tool.name}...")
+            
             prompt = (
                 f"You are an autonomous agent. Your role is: {self.role}.\n"
-                f"You have been assigned the following task: '{task}'.\n"
-                f"You have access to the following tool: {tool.name} - {tool.description}\n"
-                "Please generate the parameters needed to run the tool\n"
-                "and return them as a single string. Do not include any other text."
+                f"Task: '{task}'.\n"
+                f"Tool: {tool.name} - {tool.description}\n"
+                "Generate ONLY the search query text to pass to this tool. "
+                "Reply with NOTHING but the raw search query - no JSON, no markdown, no explanation."
             )
             tool_params_raw = self.llm_provider.generate(prompt)
-            # If the LLM returns a non-string (e.g., MagicMock in tests), fallback to using the task itself
+            
             if isinstance(tool_params_raw, str):
-                tool_params = tool_params_raw.strip()
+                # Robustly handle repetition loops by taking only the first non-empty line
+                lines = [l.strip() for l in tool_params_raw.split('\n') if l.strip()]
+                tool_params = lines[0] if lines else task
+                # Basic length safety for search tools
+                if len(tool_params) > 300:
+                    tool_params = tool_params[:300]
             else:
                 tool_params = task
-            self.logger.info(f"[{self.__class__.__name__}] Parámetros generados para la herramienta: {tool_params}")
+                
+            emit(f"[{self.name}] Ejecutando {tool.name} con: {tool_params}")
             tool_response = tool.run(tool_params)
             self.scratchpad.append({"tool_response": tool_response})
+            
             if context:
-                self.logger.info(f"[{self.__class__.__name__}] Contexto proporcionado: {context}")
                 tool_response = f"{tool_response}\nContext: {context}"
+                
+            emit(f"[{self.name}] Procesando respuesta de la herramienta...")
             prompt = (
                 f"You are an autonomous agent. Your role is: {self.role}.\n"
                 f"You have been assigned the following task: '{task}'.\n"
@@ -73,14 +90,14 @@ class Agent:
                 "Using this information, please provide an answer for the task."
             )
             final_raw = self.llm_provider.generate(prompt)
+            emit(f"[{self.name}] Tarea completada.")
+            
             if isinstance(final_raw, str):
                 return final_raw.strip()
-            # Fallback: return the tool response if LLM didn't provide a string
             return tool_response
         else:
-            self.logger.info(f"[{self.__class__.__name__}] Sin herramientas, usando LLM para resolver la tarea.")
+            emit(f"[{self.name}] No se requieren herramientas. Generando resolución directa...")
             if context:
-                self.logger.info(f"[{self.__class__.__name__}] Contexto proporcionado: {context}")
                 task = f"{task}\nContext: {context}"
             prompt = (
                 f"You are an autonomous agent. Your role is: {self.role}.\n"

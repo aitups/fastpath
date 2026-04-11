@@ -1,7 +1,7 @@
 # --- LLM Provider Configuration ---
 # Select the default LLM provider for agents.
 # Options: 'openai', 'ollama', 'gemini', 'huggingface'
-llm_provider: ollama
+llm_provider: llamacpp
 
 # --- LLM Specific Settings ---
 # Configure the parameters for each LLM provider.
@@ -11,9 +11,9 @@ llm_config:
     model: 'gpt-4o'
     api_key: ${OPENAI_API_KEY} # Loaded from environment variables
 
-  ollama:
+  llamacpp:
     model: 'qwen3:4b'
-    base_url: 'http://localhost:11434'
+    base_url: 'http://llm:8080'
 
   gemini:
     model: 'gemini-2.5-flash'

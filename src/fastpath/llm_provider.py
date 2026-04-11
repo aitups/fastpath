@@ -13,15 +13,20 @@ from .config import Config
 
 def remove_think_tags(text: str, keep_prefix: bool = True) -> str:
     """
-    Remove <think> tags from the text.
+    Remove <think> tags from the text. Handles unclosed tags gracefully.
+    If </think> is missing, returns the longer part (usually after <think>).
     """
     if "<think>" in text:
-        think_start = text.index("<think>") + len("<think>")
-        think_end = text.index("</think>")
+        think_tag_start = text.index("<think>")
+        think_end = text.find("</think>")
+        if think_end == -1:
+            # No closing tag: the model might be mid-reasoning or forgotten to close.
+            # We take everything after <think> as the likely actual response content if it's long enough.
+            after = text[think_tag_start + len("<think>"):].strip()
+            before = text[:think_tag_start].strip()
+            return after if len(after) > 10 else before
         if keep_prefix:
-            # Keep the text before <think> but remove the think tags
-            return text[:think_start] + text[think_end + len("</think>"):]
-        # Remove the text before <think> and the think tags
+            return text[:think_tag_start] + text[think_end + len("</think>"):]
         return text[think_end + len("</think>"):]
     return text
 
@@ -39,11 +44,37 @@ class OllamaProvider(LLMProvider):
     def generate(self, prompt: str, **kwargs) -> str:
         url = self.config.get("base_url", "http://localhost:11434") + "/api/generate"
         model = self.config.get("model", "llama3:8b")
-        data = {"model": model, "prompt": prompt, "stream": False}
+        timeout = self.config.get("timeout", 900)
+        num_ctx = self.config.get("num_ctx", 8192)
+        data = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"num_ctx": num_ctx},
+        }
         data.update(kwargs)
-        response = requests.post(url, json=data)
+        response = requests.post(url, json=data, timeout=timeout)
         response.raise_for_status()
         return remove_think_tags(response.json().get("response", ""), keep_prefix=False)
+
+class LlamaCppProvider(LLMProvider):
+    """Provider for llama.cpp server (llama-server) using the native /completion endpoint."""
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        base_url = self.config.get("base_url", "http://localhost:8080")
+        url = base_url.rstrip("/") + "/completion"
+        timeout = self.config.get("timeout", 900)
+        n_predict = self.config.get("n_predict", 2048)
+        data = {
+            "prompt": prompt,
+            "n_predict": n_predict,
+            "stream": False,
+        }
+        data.update(kwargs)
+        response = requests.post(url, json=data, timeout=timeout)
+        response.raise_for_status()
+        return remove_think_tags(response.json().get("content", ""), keep_prefix=False)
+
 
 class OpenAIProvider(LLMProvider):
     def generate(self, prompt: str, **kwargs) -> str:
@@ -134,16 +165,9 @@ class HuggingFaceProvider(LLMProvider):
         else:
             #print("Respuesta no coincide con ningún formato esperado")
             generated_text = str(result)
-        # Si la respuesta incluye un apartado <think> hay que eliminarlo
-        if "<think>" in generated_text:
-            think_start = generated_text.index("<think>") + len("<think>")
-            think_end = generated_text.index("</think>")
-            # Logamos la cadena de pensamiento
-            #print(f"Cadena de pensamiento: {generated_text[think_start:think_end]}")
-            # Eliminamos la cadena de pensamiento del texto generado
-            generated_text = generated_text[:think_start] + generated_text[think_end + len("</think>"):]
-            #print(f"Texto generado sin cadena de pensamiento: {generated_text}")
-        return generated_text
+        # DeepSeek often uses <think> tags for its chain of thought
+        generated_text = remove_think_tags(generated_text, keep_prefix=False)
+        return generated_text.strip()
 
 class LlamaIndexLLMAdapter(CustomLLM):
     """
@@ -193,6 +217,8 @@ def get_llm_provider_from_config(config_path: str = "config.yaml"):
         return OpenAIProvider(provider_config)
     elif provider_name == "ollama":
         return OllamaProvider(provider_config)
+    elif provider_name == "llamacpp":
+        return LlamaCppProvider(provider_config)
     elif provider_name == "gemini":
         return GeminiProvider(provider_config)
     elif provider_name == "huggingface":

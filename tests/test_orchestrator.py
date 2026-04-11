@@ -19,7 +19,7 @@ class DummyMemory(LongTermMemory):
         return []
 
 class MockAgent(Agent):
-    def act(self, task, context=None):
+    def act(self, task, context=None, callback=None):
         return f"{self.name} ejecuta {task}"
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def test_orchestrator_collaborative(mock_llm_provider):
     memory = DummyMemory(config={})
     # Cada agente responde con su nombre y el número de mensajes que ve
     class CollabAgent(Agent):
-        def act(self, task, context=None):
+        def act(self, task, context=None, callback=None):
             messages = context if context is not None else []
             return f"{self.name} vio {len(messages)} mensajes y tarea '{task}'"
     agent1 = CollabAgent(name="A1", role="R1", tools=[tool], memory=memory, llm_provider=mock_llm_provider)

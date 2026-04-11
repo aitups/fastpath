@@ -3,7 +3,7 @@ from fastpath.orchestrator import Orchestrator
 from fastpath.strategies import register_strategy, ExecutionStrategy
 
 class DummyStrategy(ExecutionStrategy):
-    def run(self, orchestrator, task, context=None):
+    def run(self, orchestrator, task, context=None, callback=None):
         return f"dummy:{task}"
 
 

@@ -3,6 +3,7 @@ from llama_index.core import (
     VectorStoreIndex,
     SimpleDirectoryReader,
     Settings,
+    StorageContext,
 )
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -32,7 +33,7 @@ try:
 except ImportError:
     HAS_ELASTIC = False
 try:
-    from llama_index.vector_stores.pgvector import PGVectorStore
+    from llama_index.vector_stores.postgres import PGVectorStore
     HAS_PGVECTOR = True
 except ImportError:
     HAS_PGVECTOR = False
@@ -65,14 +66,15 @@ def get_vector_store_from_config(config_path: str = "config.yaml"):
         )
     elif provider == "pgvector":
         if not HAS_PGVECTOR:
-            raise ImportError("llama-index-vector-stores-pgvector is not installed")
-        return PGVectorStore(
+            raise ImportError("llama-index-vector-stores-postgres is not installed")
+        return PGVectorStore.from_params(
             host=store_config.get("host", "localhost"),
-            port=store_config.get("port", 5432),
+            port=str(store_config.get("port", 5432)),
             user=store_config.get("user", "postgres"),
             password=store_config.get("password", "password"),
             database=store_config.get("database", "fastpath"),
-            table_name=store_config.get("table_name", "vectors")
+            table_name=store_config.get("table_name", "vectors"),
+            embed_dim=store_config.get("embed_dim", 384),
         )
     else:
         # Default: in-memory
@@ -123,16 +125,13 @@ class KnowledgeBase:
         """Ingests documents from a directory. Updates if doc exists, adds if not."""
         documents = SimpleDirectoryReader(data_dir).load_data()
         if self.vector_store:
-            # Use external vector store
+            storage_ctx = StorageContext.from_defaults(vector_store=self.vector_store)
             if self.index is None:
-                self.index = VectorStoreIndex.from_documents(documents, vector_store=self.vector_store)
+                self.index = VectorStoreIndex.from_documents(documents, storage_context=storage_ctx)
             else:
-                # Update or add documents
                 for doc in documents:
-                    # Try to update by doc_id, else add
                     self.index.insert(doc)
         else:
-            # In-memory
             if self.index is None:
                 self.index = VectorStoreIndex.from_documents(documents)
             else:

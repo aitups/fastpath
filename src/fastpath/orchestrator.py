@@ -31,5 +31,5 @@ class Orchestrator:
         self.llm_provider = llm_provider or get_llm_provider_from_config()
         self.logger = logging.getLogger(f"fastpath.{self.__class__.__name__}")
 
-    def run(self, task: str, context: Any = None) -> Any:
-        return self.strategy.run(self, task, context)
+    def run(self, task: str, context: Any = None, callback: Any = None) -> Any:
+        return self.strategy.run(self, task, context, callback=callback)

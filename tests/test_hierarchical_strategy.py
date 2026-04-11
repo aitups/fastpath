@@ -21,7 +21,7 @@ class DummyMemory(LongTermMemory):
 class SimpleAgent(Agent):
     def __init__(self, name, role, llm_provider=None):
         super().__init__(name=name, role=role, tools=[DummyTool(name="echo")], memory=DummyMemory(config={}), llm_provider=llm_provider or MagicMock())
-    def act(self, task, context=None):
+    def act(self, task, context=None, callback=None):
         # return a predictable string to help assert concatenation
         if context:
             return f"{self.name}-out-for-{task}-with-{context}"
