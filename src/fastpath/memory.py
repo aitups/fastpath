@@ -16,7 +16,8 @@ except ImportError:
     HAS_REDIS = False
 
 try:
-    from couchbase.cluster import Cluster, ClusterOptions
+    from couchbase.cluster import Cluster
+    from couchbase.options import ClusterOptions
     from couchbase.auth import PasswordAuthenticator
     HAS_COUCHBASE = True
 except ImportError:

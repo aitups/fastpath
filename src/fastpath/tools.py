@@ -125,3 +125,56 @@ class LangChainToolAdapter(Tool):
             return self.langchain_tool.search(text)
         else:
             raise NotImplementedError("La herramienta de LangChain no tiene método 'invoke', '__call__', 'run' ni 'search'.")
+
+
+class KnowledgeBaseQueryTool(Tool):
+    """
+    Herramienta (REQ-3.1) que permite a los agentes consultar Knowledge Bases (RAG) compartidas.
+    """
+    def __init__(self, knowledge_base: Any = None, config_path: str = "config.yaml", name: str = None, description: str = None, top_k: int = 5):
+        """
+        Args:
+            knowledge_base: instancia opcional de KnowledgeBase. Si no se pasa,
+                se crea una nueva cargando la configuración por defecto.
+            config_path: ruta al config.yaml (solo usado si knowledge_base es None).
+            top_k: número de resultados a devolver por consulta.
+        """
+        super().__init__(
+            name=name or "knowledge_base_query",
+            description=description or "Consulta la Base de Conocimiento compartida (RAG) y devuelve fragmentos relevantes. Útil para responder preguntas con información ya ingerida en el sistema."
+        )
+        self._knowledge_base = knowledge_base
+        self._config_path = config_path
+        self.top_k = top_k
+
+    @property
+    def knowledge_base(self):
+        """Lazy initialization: carga la KnowledgeBase configurada solo cuando se usa."""
+        if self._knowledge_base is None:
+            from .knowledge_base import KnowledgeBase
+            self._knowledge_base = KnowledgeBase(config_path=self._config_path)
+        return self._knowledge_base
+
+    def run(self, query: str, top_k: int = None) -> str:
+        """
+        Ejecuta una consulta contra la Knowledge Base y devuelve los fragmentos
+        relevantes formateados como texto.
+        """
+        k = top_k or self.top_k
+        try:
+            results = self.knowledge_base.query(query, top_k=k)
+        except ValueError as e:
+            return f"Error: {e}"
+        except Exception as e:
+            return f"Error consultando la Knowledge Base: {e}"
+
+        if not results:
+            return "No se encontraron resultados en la Knowledge Base."
+
+        formatted = []
+        for i, r in enumerate(results, 1):
+            text = r.get("text", "").strip()
+            score = r.get("score")
+            score_str = f" (score: {score:.4f})" if score is not None else ""
+            formatted.append(f"{i}. {text}{score_str}")
+        return "\n\n".join(formatted)

@@ -47,7 +47,20 @@ def get_vector_store_from_config(config_path: str = "config.yaml"):
     if provider == "chroma":
         if not HAS_CHROMA:
             raise ImportError("llama-index-vector-stores-chroma is not installed")
-        return ChromaVectorStore(persist_directory=store_config.get("persist_directory", "./chroma_db"))
+        # Soporta tanto persist_dir local como servidor HTTP remoto (host/port)
+        persist_dir = store_config.get("persist_directory") or store_config.get("persist_dir")
+        host = store_config.get("host")
+        port = store_config.get("port")
+        if persist_dir and not host:
+            return ChromaVectorStore(
+                persist_dir=persist_dir,
+                collection_name=store_config.get("collection_name", "fastpath"),
+            )
+        return ChromaVectorStore(
+            host=host or "localhost",
+            port=int(port or 8000),
+            collection_name=store_config.get("collection_name", "fastpath"),
+        )
     elif provider == "milvus":
         if not HAS_MILVUS:
             raise ImportError("llama-index-vector-stores-milvus is not installed")
@@ -60,8 +73,7 @@ def get_vector_store_from_config(config_path: str = "config.yaml"):
         if not HAS_ELASTIC:
             raise ImportError("llama-index-vector-stores-elasticsearch is not installed")
         return ElasticsearchStore(
-            host=store_config.get("host", "localhost"),
-            port=store_config.get("port", 9200),
+            es_url=f"http://{store_config.get('host', 'localhost')}:{store_config.get('port', 9200)}",
             index_name=store_config.get("index_name", "fastpath")
         )
     elif provider == "pgvector":

@@ -642,3 +642,77 @@ resultado = orc.run("Mi tarea especial")
 Consulta `src/fastpath/strategies.py` para más ejemplos y detalles.
 
 ---
+
+## API asíncrona y ejecución por niveles (v1.2+)
+
+A partir del cambio a arquitectura **async de extremo a extremo**, el `Orchestrator.run()` es una corrutina y debe ejecutarse con `await` (o `asyncio.run()` desde código síncrono).
+
+### Modo por defecto
+
+El orquestador opera en modo **`hierarchical`** por defecto si no se especifica `mode` ni `strategy`:
+
+```python
+# Default: hierarchical (jerárquico-smart) con reflexión/autocorrección
+orchestrator = Orchestrator(agents=[...])
+result = await orchestrator.run("tarea principal")
+```
+
+### Resultado estructurado: `ExecutionResult`
+
+`run()` devuelve un objeto `ExecutionResult` con:
+- `.success`: `bool`
+- `.output`: resultado final (resumen de la estrategia)
+- `.details`: dict completo de la estrategia (p.ej. `{"subtasks": [...], "summary": "..."}`)
+- `.reflection_rounds`: intentos realizados
+- `.attempts`: historial de intentos
+- `.error`: mensaje de error (si falló)
+
+### Ejecución jerárquica paralela
+
+`HierarchicalStrategy` descompone el plan en **niveles** según las dependencias y ejecuta
+las subtareas independientes de cada nivel de forma **concurrente** con `asyncio.gather()`.
+Esto acelera tareas que pueden ejecutarse en paralelo (p.ej. varias búsquedas web independientes).
+
+### Reflexión y autocorrección (SOTA)
+
+Si el primer intento falla o es subóptimo, el orquestador:
+1. Genera una **crítica** del resultado con el LLM.
+2. Extrae un **plan revisado** (JSON con subtareas y dependencias).
+3. Reintenta con el plan corregido, hasta `max_attempts` (por defecto 3).
+
+### Memoria persistente y Reflector Agent
+
+- **Recuperación proactiva (REQ-6.3):** cada `Agent.act()` consulta su LTM al inicio e
+  inyecta recuerdos relevantes en los prompts.
+- **Reflector (REQ-6.2):** tras cada ejecución del orquestador, se resumen los aprendizajes
+  del scratchpad y se persisten en el LTM de cada agente.
+  Puedes desactivarlo con `enable_memory_reflection=False`.
+
+### Cognitive Modeling y estado externo
+
+- **IntentModeler:** infiere la intención y urgencia del usuario antes de planificar.
+- **SystemContextAdapter:** enriquece el contexto con estado de sistemas externos (calendar/crm/erp).
+
+Ejemplo:
+```python
+from fastpath import Orchestrator, IntentModeler, SystemContextAdapter
+
+orchestrator = Orchestrator(
+    agents=[...],
+    intent_modeler=IntentModeler(llm_provider=llm),
+    system_context_adapter=SystemContextAdapter(api_clients={...}),
+)
+result = await orchestrator.run("Gestiona mi agenda")
+```
+
+### Tests
+
+```bash
+# Tests unitarios (rápidos, sin servicios externos)
+poetry run pytest -m "not integration"
+
+# Tests de integración (requieren Docker y API keys reales)
+poetry run pytest -m integration
+```
+
+---
