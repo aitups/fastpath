@@ -1,12 +1,17 @@
 from typing import Any, List
-from llama_index.core import (
-    VectorStoreIndex,
-    SimpleDirectoryReader,
-    Settings,
-    StorageContext,
-)
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+try:
+    from llama_index.core import (
+        VectorStoreIndex,
+        SimpleDirectoryReader,
+        Settings,
+        StorageContext,
+    )
+    from llama_index.embeddings.openai import OpenAIEmbedding
+    from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+    HAS_LLAMA_INDEX = True
+except ImportError:
+    HAS_LLAMA_INDEX = False
 try:
     from llama_index.embeddings.openvino import OpenVINOEmbedding
     HAS_OPENVINO = True
@@ -94,6 +99,8 @@ def get_vector_store_from_config(config_path: str = "config.yaml"):
 
 
 def get_embedding_from_config(config: dict):
+    if not HAS_LLAMA_INDEX:
+        raise ImportError("KnowledgeBase requires llama-index; install llama-index-core + embeddings")
     provider = config.get("embedding_provider", "huggingface").lower()
     model = config.get("embedding_model", "all-MiniLM-L6-v2")
     if provider == "openai":
@@ -115,6 +122,8 @@ class KnowledgeBase:
     On ingest, existing documents are updated.
     """
     def __init__(self, storage_path: str = None, config_path: str = "config.yaml"):
+        if not HAS_LLAMA_INDEX:
+            raise ImportError("KnowledgeBase requires llama-index; install llama-index-core + embeddings")
         self.storage_path = storage_path
         self.index = None
         

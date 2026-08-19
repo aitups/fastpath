@@ -2,13 +2,18 @@ from typing import Any, ClassVar
 import requests
 import openai
 import os
-from llama_index.core.llms import (
-    CustomLLM,
-    CompletionResponse,
-    CompletionResponseGen,
-    LLMMetadata,
-)
-from llama_index.core.llms.callbacks import llm_completion_callback
+try:
+    from llama_index.core.llms import (
+        CustomLLM,
+        CompletionResponse,
+        CompletionResponseGen,
+        LLMMetadata,
+    )
+    from llama_index.core.llms.callbacks import llm_completion_callback
+
+    HAS_LLAMA_INDEX = True
+except ImportError:
+    HAS_LLAMA_INDEX = False
 from .config import Config
 
 def remove_think_tags(text: str, keep_prefix: bool = True) -> str:
@@ -169,40 +174,53 @@ class HuggingFaceProvider(LLMProvider):
         generated_text = remove_think_tags(generated_text, keep_prefix=False)
         return generated_text.strip()
 
-class LlamaIndexLLMAdapter(CustomLLM):
-    """
-    An adapter to make FastPath's LLMProvider compatible with LlamaIndex's LLM interface.
-    This version is compatible with Pydantic v2 used by LlamaIndex.
-    """
-    llm_provider: LLMProvider
-    _model_name: ClassVar[str] = "fastpath_adapted_llm"
+if HAS_LLAMA_INDEX:
 
-    def _get_model_name(self) -> str:
-        return self._model_name
 
-    @property
-    def metadata(self) -> LLMMetadata:
-        """Get LLM metadata."""
-        return LLMMetadata(
-            context_window=8192,
-            num_output=2048,
-            model_name=self._get_model_name(),
-        )
+    class LlamaIndexLLMAdapter(CustomLLM):
+        """
+        An adapter to make FastPath's LLMProvider compatible with LlamaIndex's LLM interface.
+        This version is compatible with Pydantic v2 used by LlamaIndex.
+        """
+        llm_provider: LLMProvider
+        _model_name: ClassVar[str] = "fastpath_adapted_llm"
 
-    @llm_completion_callback()
-    def complete(self, prompt: str, **kwargs: Any) -> CompletionResponse:
-        response_text = self.llm_provider.generate(prompt, **kwargs)
-        return CompletionResponse(text=response_text)
+        def _get_model_name(self) -> str:
+            return self._model_name
 
-    @llm_completion_callback()
-    def stream_complete(self, prompt: str, **kwargs: Any) -> CompletionResponseGen:
-        # This is a non-streaming stand-in for the streaming interface
-        response_text = self.llm_provider.generate(prompt, **kwargs)
-        
-        def gen() -> CompletionResponseGen:
-            yield CompletionResponse(text=response_text, delta=response_text)
+        @property
+        def metadata(self) -> LLMMetadata:
+            """Get LLM metadata."""
+            return LLMMetadata(
+                context_window=8192,
+                num_output=2048,
+                model_name=self._get_model_name(),
+            )
 
-        return gen()
+        @llm_completion_callback()
+        def complete(self, prompt: str, **kwargs: Any) -> CompletionResponse:
+            response_text = self.llm_provider.generate(prompt, **kwargs)
+            return CompletionResponse(text=response_text)
+
+        @llm_completion_callback()
+        def stream_complete(self, prompt: str, **kwargs: Any) -> CompletionResponseGen:
+            # This is a non-streaming stand-in for the streaming interface
+            response_text = self.llm_provider.generate(prompt, **kwargs)
+
+            def gen() -> CompletionResponseGen:
+                yield CompletionResponse(text=response_text, delta=response_text)
+
+            return gen()
+
+
+else:
+    class LlamaIndexLLMAdapter:
+        """Placeholder when llama-index is not installed (fails on use)."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "LlamaIndexLLMAdapter requires llama-index; install llama-index-core"
+            )
 
 def get_llm_provider_from_config(config_path: str = "config.yaml"):
     """
